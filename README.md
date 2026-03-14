@@ -1,4 +1,17 @@
 # momentum-Bias-Conformation-Overlay-1
+
+A visual-only market-state overlay for TradingView, designed around a 3-minute execution chart with 15-minute higher-timeframe context. Combines local MACD/RSI momentum, session VWAP bias, HTF EMA(21) trend, ADX/DI strength, and a 15m ATR ZLEMA trend-state into a single compact score dashboard and a set of non-repainting trade markers.
+
+**Features**
+- 3m MACD histogram + RSI local momentum coloring
+- Session VWAP with configurable neutral buffer
+- 15m EMA(21) directional bias and ADX/DI strength gate
+- Optional 15m MACD/RSI momentum confirmation
+- 15m ATR ZLEMA trend-state with confirmed and potential reversal markers
+- Compact score dashboard (top-right) summarising all layers
+- All 15m data sourced from the last *confirmed* bar — no repainting
+
+```pine
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // © luckyrooster
 //@version=6
@@ -456,3 +469,41 @@ f_vwap_short() =>
     aboveVWAP ? "Above" : belowVWAP ? "Below" : "Near"
 
 if barstate.islast and showDashboard
+    // Row 0 — overall alignment
+    table.cell(dash, 0, 0, "Alignment",    text_color=color.white, bgcolor=color.new(color.gray, 50), text_size=size.small)
+    table.cell(dash, 1, 0, f_bias_text(),  text_color=color.white, bgcolor=f_bias_bg(),               text_size=size.small)
+
+    // Row 1 — 3m (LTF) momentum
+    table.cell(dash, 0, 1, "3m Momentum",  text_color=color.white, bgcolor=color.new(color.gray, 50), text_size=size.small)
+    table.cell(dash, 1, 1, f_state_short(ltfBullMomentum, ltfBearMomentum),
+         text_color=color.white,
+         bgcolor=ltfBullMomentum ? color.new(bullColor, 20) : ltfBearMomentum ? color.new(bearColor, 20) : color.new(color.gray, 20),
+         text_size=size.small)
+
+    // Row 2 — VWAP position
+    table.cell(dash, 0, 2, "VWAP",         text_color=color.white, bgcolor=color.new(color.gray, 50), text_size=size.small)
+    table.cell(dash, 1, 2, f_vwap_short(),
+         text_color=color.white,
+         bgcolor=aboveVWAP ? color.new(bullColor, 20) : belowVWAP ? color.new(bearColor, 20) : color.new(color.gray, 20),
+         text_size=size.small)
+
+    // Row 3 — 15m trend
+    table.cell(dash, 0, 3, "15m Trend",    text_color=color.white, bgcolor=color.new(color.gray, 50), text_size=size.small)
+    table.cell(dash, 1, 3, f_state_short(htfBullTrend, htfBearTrend),
+         text_color=color.white,
+         bgcolor=htfBullTrend ? color.new(bullColor, 20) : htfBearTrend ? color.new(bearColor, 20) : color.new(color.gray, 20),
+         text_size=size.small)
+
+    // Row 4 — 15m ADX/DI strength
+    table.cell(dash, 0, 4, "15m Strength", text_color=color.white, bgcolor=color.new(color.gray, 50), text_size=size.small)
+    table.cell(dash, 1, 4, f_state_short(htfBullStrength, htfBearStrength),
+         text_color=color.white,
+         bgcolor=htfBullStrength ? color.new(bullColor, 20) : htfBearStrength ? color.new(bearColor, 20) : color.new(color.gray, 20),
+         text_size=size.small)
+
+    // Row 5 — composite score (meter | numeric)
+    table.cell(dash, 0, 5, f_score_meter(alignmentScore, scoreMax),
+         text_color=f_score_color(alignmentScore), bgcolor=color.new(color.gray, 50), text_size=size.small)
+    table.cell(dash, 1, 5, f_score_text(alignmentScore, scoreMax),
+         text_color=f_score_color(alignmentScore), bgcolor=color.new(color.gray, 50), text_size=size.small)
+```
