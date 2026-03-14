@@ -1,8 +1,14 @@
-# momentum-Bias-Conformation-Overlay-1
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // © luckyrooster
 //@version=6
-indicator("3m / 15m Alignment Overlay + Confirmed 15m ATR ZLEMA State", shorttitle="3m-15m Align + ATRZ C", overlay=true, max_bars_back=1000, max_labels_count=500, max_boxes_count=200)
+indicator(
+    "3m / 15m Alignment Overlay + Confirmed 15m ATR ZLEMA State",
+    shorttitle="3m-15m Align + ATRZ C",
+    overlay=true,
+    max_bars_back=1000,
+    max_labels_count=500,
+    max_boxes_count=200
+)
 
 //====================================================================
 // PURPOSE
@@ -34,6 +40,7 @@ indicator("3m / 15m Alignment Overlay + Confirmed 15m ATR ZLEMA State", shorttit
 // Marker rendering fix:
 // Markers use label.new() instead of plotshape() to avoid TradingView's
 // 64-plot script limit while preserving configurable marker sizes.
+
 
 //====================================================================
 // INPUT GROUPS
