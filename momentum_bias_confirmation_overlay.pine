@@ -30,11 +30,14 @@ indicator(
 // This keeps the overlay stable and non-repainting.
 //
 // Marker model:
-// - Buy      = bullish regime begins
-// - Sell     = bearish regime begins
-// - StopSell = exit long when bullish regime ends without same-bar short flip
-// - StopBuy  = exit short when bearish regime ends without same-bar long flip
-// - Bull/Bear Reversal = confirmed 15m ATR ZLEMA reversal-state begins
+// - Buy                        = bullish regime begins
+// - Sell                       = bearish regime begins
+// - StopSell                   = exit long when bullish regime ends without same-bar short flip
+// - StopBuy                    = exit short when bearish regime ends without same-bar long flip
+// - Bull/Bear Align Begins     = core alignment (4-component) starts but full regime has not yet started
+//                                on same bar; suppressed when same-bar Regime label would duplicate
+// - Bull/Bear Align Weakening  = core alignment ends; suppressed when same-bar opposite regime begins
+// - Bull/Bear Reversal         = confirmed 15m ATR ZLEMA reversal-state begins
 // - Potential Bull/Bear Reversal = regime first disagrees with 15m ATR ZLEMA state
 //
 // Marker rendering fix:
@@ -117,9 +120,13 @@ showDashboard = input.bool(true, "Show Compact Dashboard", group=GROUP_VISUAL)
 
 showTradeSignals             = input.bool(true, "Show Buy / Sell Symbols", group=GROUP_LABELS)
 showExitSignals              = input.bool(true, "Show StopBuy / StopSell Symbols", group=GROUP_LABELS)
+showAlignmentBeginSymbols    = input.bool(true, "Show Alignment Begin Symbols", group=GROUP_LABELS)
+showWeakeningSymbols         = input.bool(true, "Show Alignment Weakening Symbols", group=GROUP_LABELS)
 showPotentialReversalSymbols = input.bool(true, "Show Potential Reversal Symbols", group=GROUP_LABELS)
 tradeSignalSize              = input.string(size.tiny, "Buy / Sell Symbol Size", options=[size.tiny, size.small, size.normal, size.large, size.huge], group=GROUP_LABELS)
 exitSignalSize               = input.string(size.small, "StopBuy / StopSell Symbol Size", options=[size.tiny, size.small, size.normal, size.large, size.huge], group=GROUP_LABELS)
+alignmentBeginSize           = input.string(size.tiny, "Alignment Begin Symbol Size", options=[size.tiny, size.small, size.normal, size.large, size.huge], group=GROUP_LABELS)
+weakeningSize                = input.string(size.tiny, "Alignment Weakening Symbol Size", options=[size.tiny, size.small, size.normal, size.large, size.huge], group=GROUP_LABELS)
 confirmedReversalSize        = input.string(size.tiny, "Confirmed Reversal Symbol Size", options=[size.tiny, size.small, size.normal, size.large, size.huge], group=GROUP_LABELS)
 potentialReversalSize        = input.string(size.tiny, "Potential Reversal Symbol Size", options=[size.tiny, size.small, size.normal, size.large, size.huge], group=GROUP_LABELS)
 
@@ -145,6 +152,10 @@ buySignalColor         = input.color(color.new(color.lime, 0), "Buy Symbol", gro
 sellSignalColor        = input.color(color.new(color.red, 0), "Sell Symbol", group=GROUP_COLORS)
 stopBuySignalColor     = input.color(color.new(color.lime, 0), "StopBuy Symbol", group=GROUP_COLORS)
 stopSellSignalColor    = input.color(color.new(color.red, 0), "StopSell Symbol", group=GROUP_COLORS)
+bullAlignBeginColor    = input.color(color.new(color.lime, 40), "Bull Alignment Begin Symbol", group=GROUP_COLORS)
+bearAlignBeginColor    = input.color(color.new(color.red, 40), "Bear Alignment Begin Symbol", group=GROUP_COLORS)
+bullWeakeningColor     = input.color(color.new(color.lime, 60), "Bull Alignment Weakening Symbol", group=GROUP_COLORS)
+bearWeakeningColor     = input.color(color.new(color.red, 60), "Bear Alignment Weakening Symbol", group=GROUP_COLORS)
 potentialBullRevColor  = input.color(color.new(color.teal, 0), "Potential Bull Reversal Symbol", group=GROUP_COLORS)
 potentialBearRevColor  = input.color(color.new(color.orange, 0), "Potential Bear Reversal Symbol", group=GROUP_COLORS)
 confirmBullRevColor    = input.color(color.new(color.aqua, 0), "Confirmed Bull Reversal Symbol", group=GROUP_COLORS)
@@ -313,6 +324,12 @@ bullRegimeBegins    = bullAlignment and not bullAlignment[1]
 bearRegimeBegins    = bearAlignment and not bearAlignment[1]
 neutralRegimeBegins = neutralState and not neutralState[1]
 
+// Core alignment (4-component base) transition events
+bullAlignBaseBegins = bullAlignmentBase and not bullAlignmentBase[1]
+bearAlignBaseBegins = bearAlignmentBase and not bearAlignmentBase[1]
+bullAlignWeakens    = bullAlignmentBase[1] and not bullAlignmentBase
+bearAlignWeakens    = bearAlignmentBase[1] and not bearAlignmentBase
+
 newHTFBar = timeframe.change(htfTf)
 htfBullReversalBegins = newHTFBar and htfBullReversalRaw
 htfBearReversalBegins = newHTFBar and htfBearReversalRaw
@@ -327,6 +344,14 @@ sellSignal = barClosed and bearRegimeBegins
 
 stopSellSignal = barClosed and bullAlignment[1] and not bullAlignment and not bearRegimeBegins
 stopBuySignal  = barClosed and bearAlignment[1] and not bearAlignment and not bullRegimeBegins
+
+// Alignment Begin: core starts but same-bar Regime label would duplicate → suppress
+bullAlignBeginSignal = barClosed and bullAlignBaseBegins and not bullRegimeBegins
+bearAlignBeginSignal = barClosed and bearAlignBaseBegins and not bearRegimeBegins
+
+// Weakening: core ends; suppress when same-bar opposite regime begins (that label covers the flip)
+bullWeakeningSignal = barClosed and bullAlignWeakens and not bearRegimeBegins
+bearWeakeningSignal = barClosed and bearAlignWeakens and not bullRegimeBegins
 
 confirmBullReversalSignal = barClosed and htfBullReversalBegins
 confirmBearReversalSignal = barClosed and htfBearReversalBegins
@@ -409,6 +434,18 @@ if showExitSignals and stopBuySignal
 if showExitSignals and stopSellSignal
     label.new(bar_index, na, "", yloc=yloc.abovebar, style=label.style_xcross, color=stopSellSignalColor, textcolor=stopSellSignalColor, size=exitSignalSize)
 
+if showAlignmentBeginSymbols and bullAlignBeginSignal
+    label.new(bar_index, na, "", yloc=yloc.belowbar, style=label.style_arrowup, color=bullAlignBeginColor, textcolor=bullAlignBeginColor, size=alignmentBeginSize)
+
+if showAlignmentBeginSymbols and bearAlignBeginSignal
+    label.new(bar_index, na, "", yloc=yloc.abovebar, style=label.style_arrowdown, color=bearAlignBeginColor, textcolor=bearAlignBeginColor, size=alignmentBeginSize)
+
+if showWeakeningSymbols and bullWeakeningSignal
+    label.new(bar_index, na, "", yloc=yloc.belowbar, style=label.style_square, color=bullWeakeningColor, textcolor=bullWeakeningColor, size=weakeningSize)
+
+if showWeakeningSymbols and bearWeakeningSignal
+    label.new(bar_index, na, "", yloc=yloc.abovebar, style=label.style_square, color=bearWeakeningColor, textcolor=bearWeakeningColor, size=weakeningSize)
+
 if showHTFReversalMarks and confirmBullReversalSignal
     label.new(bar_index, na, "", yloc=yloc.belowbar, style=label.style_diamond, color=confirmBullRevColor, textcolor=confirmBullRevColor, size=confirmedReversalSize)
 
@@ -463,3 +500,39 @@ f_vwap_short() =>
     aboveVWAP ? "Above" : belowVWAP ? "Below" : "Near"
 
 if barstate.islast and showDashboard
+    // Row 0: header
+    table.cell(dash, 0, 0, "3m / 15m Align", bgcolor=color.new(color.gray, 50), text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 0, "State", bgcolor=color.new(color.gray, 50), text_color=color.white, text_size=size.small)
+
+    // Row 1: Bias
+    table.cell(dash, 0, 1, "Bias", bgcolor=color.new(color.gray, 70), text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 1, f_bias_text(), bgcolor=f_bias_bg(), text_color=color.white, text_size=size.small)
+
+    // Row 2: Score  (classification + numeric score + meter)
+    string scoreClass = f_score_state(alignmentScore)
+    string scoreMeter = f_score_meter(alignmentScore, scoreMax)
+    string scoreNum   = f_score_text(alignmentScore, scoreMax)
+    color  scoreColor = f_score_color(alignmentScore)
+    table.cell(dash, 0, 2, "Score", bgcolor=color.new(color.gray, 70), text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 2, scoreClass + "  " + scoreNum + "  " + scoreMeter, bgcolor=scoreColor, text_color=color.white, text_size=size.small)
+
+    // Row 3: 3m  (Momentum + VWAP)
+    string ltfMomStr = f_state_short(ltfBullMomentum, ltfBearMomentum)
+    string vwapStr   = f_vwap_short()
+    color  ltfBg     = ltfBullMomentum ? color.new(color.lime, 70) : ltfBearMomentum ? color.new(color.red, 70) : color.new(color.gray, 70)
+    table.cell(dash, 0, 3, "3m", bgcolor=color.new(color.gray, 70), text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 3, "Mom:" + ltfMomStr + "  VWAP:" + vwapStr, bgcolor=ltfBg, text_color=color.white, text_size=size.small)
+
+    // Row 4: 15m Core  (EMA Bias + ADX/DI Strength)
+    string htfEmaStr  = f_state_short(htfBullTrend, htfBearTrend)
+    string htfAdxStr  = f_state_short(htfBullStrength, htfBearStrength)
+    color  htfCoreBg  = (htfBullTrend and htfBullStrength) ? color.new(color.lime, 70) : (htfBearTrend and htfBearStrength) ? color.new(color.red, 70) : color.new(color.gray, 70)
+    table.cell(dash, 0, 4, "15m Core", bgcolor=color.new(color.gray, 70), text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 4, "EMA:" + htfEmaStr + "  ADX:" + htfAdxStr, bgcolor=htfCoreBg, text_color=color.white, text_size=size.small)
+
+    // Row 5: 15m Conf  (Optional Momentum + ATRZ State)
+    string htfMomStr  = f_state_short(htfBullMomentum, htfBearMomentum)
+    string htfAtrzStr = f_state_short(htfATRZBull, htfATRZBear)
+    color  htfConfBg  = (htfBullMomentum and htfATRZBull) ? color.new(color.lime, 70) : (htfBearMomentum and htfATRZBear) ? color.new(color.red, 70) : color.new(color.gray, 70)
+    table.cell(dash, 0, 5, "15m Conf", bgcolor=color.new(color.gray, 70), text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 5, "Mom:" + htfMomStr + "  ATRZ:" + htfAtrzStr, bgcolor=htfConfBg, text_color=color.white, text_size=size.small)
